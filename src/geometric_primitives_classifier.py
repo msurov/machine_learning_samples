@@ -42,6 +42,19 @@ def gen_cross_sample():
     im = cv2.GaussianBlur(im, (3,3), 1)
     return im
 
+def gen_noise_sample():
+    im = np.zeros((32,32), dtype=np.uint8)
+    vals = (5 * np.random.random(size=4)).astype(int)
+    vals += np.array([5, 22, 5, 22])
+    x1,x2,y1,y2 = vals
+    im = 255 * np.random.normal(size=((y2-y1)//2, (x2-x1)//2))
+    im = cv2.pyrUp(im.astype(np.uint8))
+    im2 = np.zeros((32, 32), dtype=np.uint8)
+    dy,dx = im.shape
+    im2[y1:y1+dy,x1:x1+dx] = im
+    im2 = cv2.GaussianBlur(im2, (3,3), 1)
+    return im2
+
 def gen_plus_sample():
     im = np.zeros((32, 32), np.uint8)
     p = 2 * np.random.normal(size=2) + 16
@@ -105,23 +118,28 @@ def prepare_dataset(sz):
     triangles = [gen_triangle_sample() for i in range(sz//3)]
     circles = [gen_circle_sample() for i in range(sz//3)]
     crosses = [gen_cross_sample() for i in range(sz//3)]
+    randoms = [gen_noise_sample() for i in range(sz//3)]
 
     triangles = np.array(triangles)
     circles = np.array(circles)
     crosses = np.array(crosses)
 
-    triangle_labels = np.zeros((len(triangles), 3))
+    triangle_labels = np.zeros((len(triangles), 4))
     triangle_labels[:,0] = 1
 
-    circle_labels = np.zeros((len(circles), 3))
+    circle_labels = np.zeros((len(circles), 4))
     circle_labels[:,1] = 1
 
-    cross_labels = np.zeros((len(crosses), 3))
+    cross_labels = np.zeros((len(crosses), 4))
     cross_labels[:,2] = 1
 
-    inputs = np.concatenate((triangles, circles, crosses), axis=0)
-    labels = np.concatenate((triangle_labels, circle_labels, cross_labels), axis=0)
-    titles = ('triangle', 'circle', 'cross')
+    random_labels = np.zeros((len(randoms), 4))
+    random_labels[:,3] = 1
+
+    inputs = np.concatenate((triangles, circles, crosses, randoms), axis=0)
+    labels = np.concatenate(
+        (triangle_labels, circle_labels, cross_labels, random_labels), axis=0)
+    titles = ('triangle', 'circle', 'cross', 'noise')
 
     return inputs, labels, titles
 
@@ -129,31 +147,31 @@ def create_model1():
     l = [
         Input(shape=(32, 32, 1)),
         # (3x3 + 1) * 10 parameters
-        layers.Conv2D(10, kernel_size=3, activation='relu'),
+        layers.Conv2D(6, kernel_size=3, activation='relu'),
         layers.MaxPool2D(pool_size=2, strides=2),
 
         # (3x3x10 + 1) * 10 parameters
-        layers.Conv2D(10, kernel_size=(3,3), activation='relu'),
+        layers.Conv2D(12, kernel_size=(3,3), activation='relu'),
         layers.MaxPool2D(pool_size=2, strides=2),
 
         layers.Flatten(),
 
         # fully connected layer
         layers.Dense(1024, activation='relu'),
-        layers.Dense(3, activation='softmax'),
+        layers.Dense(4, activation='softmax'),
     ]
     model = models.Sequential(l)
     model.summary()
     return model
 
 def test1():
-    if exists('data/model1'):
-        model = models.load_model('data/model1')
+    if exists('data/model_classifier-1'):
+        model = models.load_model('data/model_classifier-1')
     else:
         model = create_model1()
 
     # learn the model
-    if False:
+    if True:
         inputs, labels, titles = prepare_dataset(1000)
         test_inputs, test_labels, _ = prepare_dataset(100)
 
@@ -161,7 +179,7 @@ def test1():
         model.compile('adam', loss)
         history = model.fit(inputs, labels, epochs=100, 
             validation_data=(test_inputs, test_labels), batch_size=20)
-        model.save('data/model1')
+        model.save('data/model_classifier-1')
         plt.plot(history.history['loss'])
         plt.plot(history.history['val_loss'])
         plt.show()
@@ -188,6 +206,11 @@ def test1():
         indices = np.argmax(ans, axis=1)
         print(ans)
         assert np.allclose(indices, 2)
+
+        print('random')
+        samples = np.array([gen_noise_sample() for i in range(10)])
+        ans = model(samples)
+        print(ans)
 
     # look how new figures recognized
     if True:
@@ -230,20 +253,20 @@ def create_model2():
     return model
 
 def test2():
-    if exists('data/model2'):
-        model = models.load_model('data/model2')
+    if exists('data/model_classifier-2'):
+        model = models.load_model('data/model_classifier-2')
     else:
         model = create_model2()
 
     # learn the model
-    if False:
+    if True:
         inputs, labels, titles = prepare_dataset(5000)
         test_inputs, test_labels, _ = prepare_dataset(500)
         loss = tf.keras.losses.BinaryCrossentropy()
         model.compile('adam', loss)
         history = model.fit(inputs, labels, epochs=500, 
             validation_data=(test_inputs, test_labels), batch_size=50)
-        model.save('data/model2')
+        model.save('data/model_classifier-2')
         plt.plot(history.history['loss'])
         plt.plot(history.history['val_loss'])
         plt.show()
@@ -291,5 +314,5 @@ def test2():
 
 if __name__ == '__main__':
     np.set_printoptions(suppress=True)
-    # test1()
-    test2()
+    test1()
+    # test2()

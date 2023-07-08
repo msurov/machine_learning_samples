@@ -55,7 +55,7 @@ def deblur(model, im):
     return dst
 
 def test():
-    if exists('data/model_deblur'):
+    if False and exists('data/model_deblur'):
         model = models.load_model('data/model_deblur')
     else:
         l = [
@@ -74,7 +74,7 @@ def test():
         loss = losses.MeanSquaredError()
         model.compile('adam', loss)
 
-        inputs, outputs = prepare_dataset('data/sample_deblur/flower.jpg')
+        inputs, outputs = prepare_dataset('data/samples_deblur/flower.jpg')
         n = len(inputs)
         indices = np.arange(n, dtype=int)
         np.random.shuffle(indices)
@@ -95,11 +95,11 @@ def test():
 
     if True:
         model = models.load_model('data/model_deblur')
-        src = cv2.imread('data/sample_deblur/flower-cr.jpg')
+        src = cv2.imread('data/samples_deblur/flower-cr.jpg')
         blurred = cv2.pyrUp(src)
-        cv2.imwrite('data/sample_deblur/blurred.jpg', blurred)
+        cv2.imwrite('data/samples_deblur/blurred.jpg', blurred)
         dst = deblur(model, blurred)
-        cv2.imwrite('data/sample_deblur/deblurred.jpg', dst)
+        cv2.imwrite('data/samples_deblur/deblurred.jpg', dst)
 
 
 if __name__ == '__main__':
